@@ -178,6 +178,11 @@
   .pos-chg{font-family:var(--mono);font-size:11px;margin-top:2px;}
   .pos-row.acc .pos-name{font-weight:500;}
   .pos-x{grid-column:1/-1;}
+  .demo{display:grid;grid-template-columns:130px 1fr;gap:14px;align-items:center;margin-top:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;}
+  .demo svg{width:100%;height:auto;display:block;background:var(--paper);border-radius:9px;}
+  .cues{min-width:0;}
+  .cues ol{margin:8px 0 0 18px;font-size:13px;line-height:1.45;color:var(--ink-2);}
+  .cues li{padding:2px 0;}
   .lift-log{display:flex;gap:8px;align-items:center;padding-top:10px;flex-wrap:wrap;}
   .lift-log input{width:84px;}
   .lift-log .x{font-family:var(--mono);color:var(--ink-3);}
@@ -520,7 +525,7 @@ function liftRow(m,i){
   var x='';
   if(open){
     var from=rangeFrom('lift',h.length?h[0].date:TODAY);
-    x='<div class="pos-x"><div class="chart-card" style="margin-top:8px"><div class="chart-head"><span class="chart-title">'+(m.bodyweight?'Reps':'Top set &amp; e1RM')+'</span>'+seg('lift',['3M','6M','1Y','ALL'])+'</div>'
+    x='<div class="pos-x">'+demoBlock(m.id)+'<div class="chart-card" style="margin-top:8px"><div class="chart-head"><span class="chart-title">'+(m.bodyweight?'Reps':'Top set &amp; e1RM')+'</span>'+seg('lift',['3M','6M','1Y','ALL'])+'</div>'
       +tchart({from:from,to:TODAY,h:150,bands:holBands(),yfmt:function(v){return Math.round(v);},series:m.bodyweight?[{type:'line',pts:h.map(function(x){return [x.date,x.reps];}),color:'var(--gain)',end:true}]
         :[{type:'dots',pts:h.map(function(x){return [x.date,x.weight];}),color:'var(--ink-3)',r:2,op:.7},{type:'line',pts:h.map(function(x){return [x.date,r1(e1rm(x.weight,x.reps))];}),color:'var(--gain)',w:2,end:true}]})
       +(m.bodyweight?'':'<div class="legend"><span><i style="background:var(--ink-3)"></i>top set kg</span><span><i style="background:var(--gain)"></i>estimated 1RM</span></div>')+'</div>'
@@ -547,12 +552,85 @@ function buildTraining(){
   return numbers()
     +'<div class="sec-label">Program &middot; '+D.program.perWeek+'× per week</div><div class="days">'+chips+'</div>'
     +'<div class="card" style="margin-top:10px"><div class="prog-head"><span class="prog-name">'+esc(d.name)+'</span><span class="prog-tag">Day '+(dayIdx+1)+' · '+(d.main.length+(d.accessories||0))+' lifts</span></div><div class="prog-desc">'+esc(d.desc)+'</div>'
-    +'<div class="sub-h">Main lifts · tap for history</div><div class="positions">'+mains+'</div>'
+    +'<div class="sub-h">Main lifts · tap for demo &amp; history</div><div class="positions">'+mains+'</div>'
     +'<div class="sub-h">Accessories</div><div class="positions">'+accs+'</div>'
     +'<button class="mini-btn log-day" data-act="logday"'+(doneToday?' disabled style="opacity:.55"':'')+'>'+(doneToday?'✓ '+esc(d.name)+' logged today':'Log '+esc(d.name)+' session')+'</button></div>'
     +'<div class="chart-card"><div class="chart-head"><span class="chart-title">Weekly volume &middot; main lifts (t)</span></div>'+tchart({from:addDays(ws,-7*25),to:addDays(ws,6),h:130,zero:true,bands:holBands(),yfmt:function(v){return v;},series:[{type:'bars',pts:ton,color:'var(--gain)',wf:4.2}]})+'</div>'
     +'<div class="sec-label">Personal bests</div><div class="card"><ul class="prs">'+prs.map(function(p){ var recent=p.b.date>=addDays(TODAY,-30); return '<li><span>'+esc(p.m.name)+'</span><span class="pv">'+p.b.weight+'kg × '+p.b.reps+' · <b>'+r1(e1rm(p.b.weight,p.b.reps))+'</b> e1rm'+(recent?' ★':'')+'<br><span class="muted">'+fmtDate(p.b.date)+'</span></span></li>'; }).join('')+'</ul></div>'
     +note(D.notes.training,'Training');
+}
+
+/* ---------------- movement demos (simple animated stick figures, side view) ---------------- */
+var DEMO={
+  pullup:{cues:['Start from a dead hang','Drive elbows down to your ribs','Chin clears the bar'],
+    a:{H:[61,36],N:[58,44],P:[58,74],K:[60,90],A:[54,101],E:[55,29],W:[60,14]},
+    b:{H:[62,4],N:[59,14],P:[57,44],K:[60,60],A:[54,71],E:[45,20],W:[60,13]}},
+  bench:{cues:['Shoulder blades pinned back','Bar to lower chest','Feet driving into the floor'],
+    a:{H:[36,69],N:[46,71],P:[74,71],K:[90,70],A:[94,108],E:[40,80],W:[50,63]},
+    b:{H:[36,69],N:[46,71],P:[74,71],K:[90,70],A:[94,108],E:[46,53],W:[46,33]}},
+  incline:{cues:['Bench at 30–45°','Elbows about 45° from your sides','Press up and slightly back'],
+    a:{H:[43,51],N:[48,60],P:[66,88],K:[84,87],A:[88,108],E:[38,71],W:[47,58]},
+    b:{H:[43,51],N:[48,60],P:[66,88],K:[84,87],A:[88,108],E:[51,43],W:[55,26]}},
+  row:{cues:['Hinge to about 45°, flat back','Pull to your lower ribs','No torso swing'],
+    a:{H:[85,44],N:[77,50],P:[49,68],K:[63,89],A:[58,108],E:[78,66],W:[79,85]},
+    b:{H:[85,44],N:[77,50],P:[49,68],K:[63,89],A:[58,108],E:[60,55],W:[71,67]}},
+  ohp:{cues:['Glutes and abs braced','Head through at lockout','Bar finishes over mid-foot'],
+    a:{H:[62,30],N:[60,38],P:[60,68],K:[60,88],A:[60,108],E:[66,49],W:[69,37]},
+    b:{H:[63,30],N:[60,38],P:[60,68],K:[60,88],A:[60,108],E:[62,22],W:[61,7]}},
+  lateral:{front:true,cues:['Soft bend in the elbow','Lead with the elbows','Stop at shoulder height'],
+    a:{H:[60,29],N:[60,38],P:[60,68],K:[55,88],A:[54,108],K2:[65,88],A2:[66,108],E:[53,53],W:[51,67],E2:[67,53],W2:[69,67]},
+    b:{H:[60,29],N:[60,38],P:[60,68],K:[55,88],A:[54,108],K2:[65,88],A2:[66,108],E:[45,41],W:[31,40],E2:[75,41],W2:[89,40]}},
+  hex:{cues:['Hips down, chest up','Push the floor away','Stand tall, no leaning back'],
+    a:{H:[80,54],N:[72,60],P:[51,81],K:[71,91],A:[60,108],E:[68,74],W:[65,89]},
+    b:{H:[62,30],N:[60,38],P:[58,68],K:[61,88],A:[60,108],E:[60,53],W:[60,68]}},
+  hipthrust:{cues:['Upper back on the bench edge','Chin tucked, ribs down','Squeeze glutes hard at the top'],
+    a:{H:[31,71],N:[40,77],P:[57,94],K:[77,81],A:[81,108],E:[47,86],W:[56,88]},
+    b:{H:[31,71],N:[40,77],P:[62,74],K:[81,74],A:[83,108],E:[50,78],W:[61,69]}},
+  nordic:{cues:['Ankles anchored under the pad','Lower as slowly as you can','Hips stay straight, no folding'],
+    a:{H:[54,35],N:[52,43],P:[50,74],K:[50,104],A:[28,104],E:[59,55],W:[64,47]},
+    b:{H:[96,52],N:[90,58],P:[71,83],K:[50,104],A:[28,104],E:[96,73],W:[101,89]}}
+};
+function lerp(a,b,t){ return [a[0]+(b[0]-a[0])*t, a[1]+(b[1]-a[1])*t]; }
+function demoSvg(id,t){
+  var d=DEMO[id], p={}; Object.keys(d.a).forEach(function(k){ p[k]=lerp(d.a[k],d.b[k],t); });
+  function L(a,b,c,w,op){ return '<line x1="'+a[0].toFixed(1)+'" y1="'+a[1].toFixed(1)+'" x2="'+b[0].toFixed(1)+'" y2="'+b[1].toFixed(1)+'" stroke="'+c+'" stroke-width="'+(w||4)+'" stroke-linecap="round"'+(op?' opacity="'+op+'"':'')+'/>'; }
+  function C(a,r,f){ return '<circle cx="'+a[0].toFixed(1)+'" cy="'+a[1].toFixed(1)+'" r="'+r+'" fill="'+f+'"/>'; }
+  function DB(a){ return '<rect x="'+(a[0]-6).toFixed(1)+'" y="'+(a[1]-2.5).toFixed(1)+'" width="12" height="5" rx="1.5" fill="var(--gain)"/>'; }
+  var ink='var(--ink)', eq='var(--ink-3)', s='';
+  s+=L([8,110],[112,110],'var(--line-2)',2);
+  /* fixed equipment behind the figure */
+  if(id==='pullup') s+=L([26,12],[94,12],eq,3);
+  if(id==='bench') s+='<rect x="22" y="75" width="66" height="6" rx="2" fill="'+eq+'"/>'+L([30,81],[30,110],eq,3)+L([80,81],[80,110],eq,3);
+  if(id==='incline') s+=L([42,64],[63,94],eq,6)+L([63,94],[82,94],eq,6)+L([72,94],[72,110],eq,3);
+  if(id==='hipthrust') s+='<rect x="12" y="78" width="28" height="32" rx="2" fill="'+eq+'"/>';
+  if(id==='nordic') s+='<rect x="20" y="99" width="12" height="7" rx="2" fill="'+eq+'"/>';
+  /* back limbs (front-view figure only) */
+  if(d.front){ s+=L(p.P,p.K2,ink)+L(p.K2,p.A2,ink)+L(p.N,p.E2,ink)+L(p.E2,p.W2,ink); }
+  /* body */
+  s+=L(p.P,p.K,ink)+L(p.K,p.A,ink)+L(p.N,p.P,ink,5)+L(p.N,p.E,ink)+L(p.E,p.W,ink)+C(p.H,6,ink);
+  /* load */
+  if(id==='pullup'){ var pl=[p.P[0]+4,p.P[1]+13]; s+=L(p.P,pl,eq,1.5)+C(pl,6,'var(--gain)'); }
+  if(id==='bench'||id==='row'||id==='ohp') s+=C(p.W,8,'var(--gain)')+C(p.W,2.5,'var(--card)');
+  if(id==='hex') s+=C(p.W,10,'var(--gain)')+C(p.W,3,'var(--card)');
+  if(id==='hipthrust') s+=C([p.P[0]+1,p.P[1]-6],9,'var(--gain)')+C([p.P[0]+1,p.P[1]-6],2.5,'var(--card)');
+  if(id==='incline') s+=DB(p.W);
+  if(id==='lateral') s+=DB(p.W)+DB(p.W2);
+  return s;
+}
+var demoRaf=null, demoT0=0, reduceMotion=false;
+try{ reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+function demoTick(now){
+  var els=document.querySelectorAll('svg[data-demo]');
+  if(!els.length){ demoRaf=null; return; }
+  if(!demoT0) demoT0=now;
+  var ph=((now-demoT0)%2600)/2600, t=reduceMotion?1:0.5-0.5*Math.cos(ph*2*Math.PI);
+  els.forEach(function(el){ el.innerHTML=demoSvg(el.getAttribute('data-demo'),t); });
+  demoRaf=requestAnimationFrame(demoTick);
+}
+function startDemos(){ if(document.querySelector('svg[data-demo]')&&!demoRaf){ demoT0=0; demoRaf=requestAnimationFrame(demoTick); } }
+function demoBlock(id){
+  if(!DEMO[id]) return '';
+  return '<div class="demo"><svg data-demo="'+id+'" viewBox="0 0 120 116" role="img" aria-label="Animated demo of the movement">'+demoSvg(id,0)+'</svg><div class="cues"><div class="chart-title">Form cues</div><ol>'+DEMO[id].cues.map(function(c){return '<li>'+esc(c)+'</li>';}).join('')+'</ol></div></div>';
 }
 
 /* ---------------- WHOOP (preview, not connected) ---------------- */
@@ -610,6 +688,7 @@ function render(){
       render(); };
     inp.addEventListener('blur',commit); inp.addEventListener('keydown',function(e){ if(e.key==='Enter') commit(); if(e.key==='Escape'){ done=true; ui.editBw=false; render(); } }); } }
   if(ui.refocus){ var r=document.getElementById(ui.refocus); ui.refocus=null; if(r) r.focus(); }
+  startDemos();
 }
 
 /* ---------------- events ---------------- */
